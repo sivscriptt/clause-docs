@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Faruma is (c) The President's Office, all rights reserved. Served by the demo, not redistributed here.
+/public/Faruma.woff2
+.open-next
+.dev.vars
+.wrangler

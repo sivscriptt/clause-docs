@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "clause-docs",
+  "account_id": "558613b5e0f0fd7a768bd3d9af314c1a",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  // Run next to Neon (Singapore): pages make several queries each, so a
+  // Worker in Male would pay a cross-region round trip per query.
+  "placement": { "mode": "targeted", "region": "aws:ap-southeast-1" },
+  "observability": { "enabled": true }
+  // DATABASE_URL is a secret: wrangler secret put DATABASE_URL
+}
