@@ -151,7 +151,7 @@ export function ClauseEditor({ initial, author, names, onChange, onClause, dir }
         <label className="flex items-center gap-1 text-sm">
           <span className="sr-only">Insert a reference to clause</span>
           <select
-            className="h-8 max-w-44 rounded-md border border-line-strong bg-white ps-2 pe-7 text-sm"
+            className="select h-8 max-w-48"
             value=""
             onChange={(e) => {
               if (e.target.value) editor.chain().focus().insertContent({ type: "xref", attrs: { target: e.target.value } }).run();

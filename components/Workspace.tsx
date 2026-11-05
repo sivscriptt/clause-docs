@@ -138,7 +138,7 @@ export function Workspace(p: Props) {
             <label className="flex items-center gap-1">
               <span>Version</span>
               <select
-                className="h-7 rounded border border-line-strong bg-white ps-1.5 pe-6 text-sm text-ink"
+                className="select h-8"
                 value={p.version.id}
                 onChange={(e) => router.push(`/docs/${p.doc.id}?v=${e.target.value}`)}
               >
@@ -419,7 +419,7 @@ function Comments(p: Props & { nums: Map<string, string>; focusClause: string | 
           onSubmit={(e) => { e.preventDefault(); submit({ body, clauseId: effectiveTarget || null, critical }, () => { setBody(""); setCritical(false); }); }}
         >
           <label className="text-xs font-medium text-muted" htmlFor="comment-target">On</label>
-          <select id="comment-target" value={effectiveTarget} onChange={(e) => setTarget(e.target.value)} className="h-8 rounded-md border border-line-strong bg-white ps-2 text-sm">
+          <select id="comment-target" value={effectiveTarget} onChange={(e) => setTarget(e.target.value)} className="select h-9 w-full">
             <option value="">The whole document</option>
             {[...p.nums].map(([id, n]) => <option key={id} value={id}>Clause {n}</option>)}
           </select>

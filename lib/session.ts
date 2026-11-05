@@ -21,9 +21,11 @@ export async function requireActor(db: pg.Client): Promise<Actor> {
 
 /** Signed-in actor and the user list, once per request. */
 export const session = cache(async () => {
+  // Read the cookie first: it marks the route as per-request before any
+  // database work, so builds never try to prerender with a live connection.
+  const id = await demoAuth.currentUserId();
   const db = await requestDb();
   const users = await listUsers(db);
-  const id = await demoAuth.currentUserId();
   const me = users.find((u) => u.id === id) ?? users.find((u) => u.id === DEFAULT_DEMO_USER);
   if (!me) throw new Error("Demo users are missing. Run the seed.");
   return { db, me, users };

@@ -10,7 +10,7 @@
   src: local("Faruma"), url("/Faruma.woff2") format("woff2");
   font-display: swap;
   unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2;
-  size-adjust: 135%;
+  size-adjust: 112%;
 }
 @font-face {
   font-family: "Thaana";
@@ -18,7 +18,7 @@
   font-weight: 100 900;
   font-display: swap;
   unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2;
-  size-adjust: 125%;
+  size-adjust: 108%;
 }
 
 @theme inline {
@@ -63,6 +63,26 @@ body {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* One look for every dropdown: our own chevron with room around it, flipped in RTL. */
+.select {
+  appearance: none;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0.5rem;
+  background-color: white;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23625f78' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.625rem center;
+  background-size: 1rem;
+  padding-inline: 0.75rem 2.25rem;
+  font-size: 0.875rem;
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+[dir="rtl"] .select { background-position: left 0.625rem center; }
+.select:hover { border-color: var(--color-ink); }
+.select:disabled { opacity: 0.6; cursor: not-allowed; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

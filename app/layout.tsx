@@ -31,7 +31,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <RoleSwitcher users={users} current={me.id} />
           </div>
           <p className="bg-ink px-4 py-2 text-center text-sm text-white">
-            Demo. Switch person above to try each role: author, reviewer, approver, reader, admin.
+            Demo. Switch role above to walk a document through review, approval and publishing.
           </p>
         </header>
         <main id="main" className="flex-1">{children}</main>
