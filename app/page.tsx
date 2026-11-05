@@ -42,6 +42,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </p>
       )}
 
+      {docs.length > 0 && (
       <ul className="mt-4 divide-y divide-line overflow-hidden rounded-lg border border-line bg-white">
         {docs.map((d) => (
           <li key={d.id}>
@@ -61,8 +62,9 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             </Link>
           </li>
         ))}
-        {!q && docs.length === 0 && <li className="px-4 py-6 text-sm text-muted">No documents yet.</li>}
       </ul>
+      )}
+      {!q && docs.length === 0 && <p className="mt-4 text-sm text-muted">No documents yet.</p>}
     </div>
   );
 }

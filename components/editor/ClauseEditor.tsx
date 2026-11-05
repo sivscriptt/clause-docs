@@ -72,10 +72,14 @@ function outline(doc: PMNode): { id: string; num: string; text: string }[] {
 
 const btn =
   "inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-sm font-medium text-ink hover:bg-paper disabled:cursor-not-allowed disabled:text-muted/60 disabled:hover:bg-transparent";
+// Same shape, but red: a separate string so text-ink never wins over the danger colour.
+const dangerBtn = btn.replace("text-ink", "text-del");
 
 export function ClauseEditor({ initial, author, names, onChange, onClause, dir }: Props) {
   Object.assign(authorNames, names);
   const [message, setMessage] = useState<string | null>(null);
+  // After Accept all / Reject all: say what happened and offer Undo.
+  const [notice, setNotice] = useState<string | null>(null);
   // Holds the clause id being confirmed, so moving the cursor cancels it.
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   // Re-render on every transaction so the toolbar reflects the cursor and document.
@@ -83,7 +87,7 @@ export function ClauseEditor({ initial, author, names, onChange, onClause, dir }
 
   const editor = useEditor({
     immediatelyRender: false,
-    textDirection: "auto",
+    textDirection: dir,
     extensions: [
       StarterKit.configure({
         heading: false, codeBlock: false, blockquote: false, horizontalRule: false, code: false,
@@ -93,7 +97,12 @@ export function ClauseEditor({ initial, author, names, onChange, onClause, dir }
       TrackChanges.configure({ author, on: true }),
     ],
     content: initial,
-    editorProps: { attributes: { class: "doc", "aria-label": "Document text", "aria-multiline": "true", role: "textbox" } },
+    editorProps: {
+      attributes: { class: "doc", "aria-label": "Document text", "aria-multiline": "true", role: "textbox" },
+      // Keep the caret clear of the sticky toolbar when it scrolls into view.
+      scrollMargin: { top: 120, bottom: 16, left: 0, right: 0 },
+      scrollThreshold: { top: 120, bottom: 16, left: 0, right: 0 },
+    },
     onUpdate: ({ editor }) => onChange(editor.getJSON() as Doc),
     onSelectionUpdate: ({ editor }) => onClause(clauseAtCursor(editor)),
     onTransaction: () => setTick((t) => t + 1),
@@ -112,6 +121,7 @@ export function ClauseEditor({ initial, author, names, onChange, onClause, dir }
     try {
       replaceDoc(editor, fn(editor.getJSON() as Doc), focus);
       setMessage(null);
+      setNotice(null);
     } catch (e) {
       setMessage(e instanceof TreeError ? e.message.replace(/^./, (c) => c.toUpperCase()) + "." : "That didn't work.");
     }
@@ -135,7 +145,7 @@ export function ClauseEditor({ initial, author, names, onChange, onClause, dir }
 
   return (
     <div className="flex flex-col gap-3">
-      <div role="toolbar" aria-label="Clause tools" className="no-print sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-lg border border-line bg-white/95 p-1 backdrop-blur">
+      <div role="toolbar" aria-label="Clause tools" dir="ltr" lang="en" className="no-print z-10 flex flex-wrap items-center gap-1 rounded-lg border border-line bg-white/95 p-1 backdrop-blur sm:sticky sm:top-0">
         <label className="me-1 flex h-8 cursor-pointer items-center gap-2 rounded-full px-2.5 text-sm font-medium hover:bg-paper">
           <input type="checkbox" className="size-4 accent-[var(--color-accent)]" checked={tracking} onChange={toggleTracking} />
           Track changes
@@ -164,27 +174,37 @@ export function ClauseEditor({ initial, author, names, onChange, onClause, dir }
           </select>
         </label>
         <span className="mx-1 h-5 w-px bg-line" aria-hidden />
-        <button type="button" className={btn} onClick={() => apply((d) => cleanView(d) as Doc, cur)} title="Accept every tracked change">Accept all</button>
-        <button type="button" className={btn} onClick={() => apply((d) => originalView(d) as Doc, cur)} title="Reject every tracked change">Reject all</button>
+        <button type="button" className={btn} onClick={() => { apply((d) => cleanView(d) as Doc, cur); setNotice("Accepted every tracked change."); }} title="Accept every tracked change">Accept all</button>
+        <button type="button" className={btn} onClick={() => { apply((d) => originalView(d) as Doc, cur); setNotice("Rejected every tracked change."); }} title="Reject every tracked change">Reject all</button>
         <span className="flex-1" />
         {confirmDelete !== null && confirmDelete === cur ? (
           <span className="flex items-center gap-1" role="group" aria-label="Confirm delete">
-            <button type="button" className={`${btn} bg-del text-white hover:bg-del/90`} onClick={() => { apply((d) => deleteClause(d, cur!), null); setConfirmDelete(null); }}>
+            <button type="button" autoFocus className={`${btn.replace("text-ink", "text-white")} bg-del hover:bg-del/90`} onClick={() => { apply((d) => deleteClause(d, cur!), null); setConfirmDelete(null); setNotice("Clause deleted."); }}>
               Delete clause {loc && clauses.find((c) => c.id === cur)?.num}
             </button>
-            <button type="button" className={btn} onClick={() => setConfirmDelete(null)}>Keep</button>
+            <button type="button" className={btn} onClick={() => { setConfirmDelete(null); requestAnimationFrame(() => document.getElementById("delete-clause")?.focus()); }}>Keep</button>
           </span>
         ) : (
-          <button type="button" className={`${btn} text-del`} disabled={!cur} onClick={() => setConfirmDelete(cur)}>Delete clause…</button>
+          <button type="button" id="delete-clause" className={dangerBtn} disabled={!cur} onClick={() => setConfirmDelete(cur)}>Delete clause…</button>
         )}
       </div>
-      <p className="no-print text-xs text-muted">
+      <p className="no-print text-xs text-muted" dir="ltr" lang="en">
         {tracking
           ? "Tracking is on: your typing shows as additions and deletions with your name. Clause moves and new clauses are not tracked."
           : "Tracking is off: edits change the text directly."}
       </p>
-      {message && <p role="alert" className="rounded-md bg-warn-bg px-3 py-2 text-sm text-warn">{message}</p>}
+      {message && <p role="alert" dir="ltr" lang="en" className="rounded-md bg-warn-bg px-3 py-2 text-sm text-warn">{message}</p>}
+      <p role="status" dir="ltr" lang="en" className={notice ? "no-print flex items-center gap-2 text-sm text-muted" : "sr-only"}>
+        {notice}
+        {notice && (
+          <button type="button" className="font-medium text-ink underline underline-offset-2" onClick={() => { editor.chain().focus().undo().run(); setNotice(null); }}>
+            Undo
+          </button>
+        )}
+      </p>
       <div
+        dir={dir}
+        lang={dir === "rtl" ? "dv" : "en"}
         onKeyDown={(e) => {
           if (!e.altKey || !e.shiftKey || !cur) return;
           const map: Record<string, () => void> = {

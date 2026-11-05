@@ -93,6 +93,8 @@ body {
 
 /* ---------- Document body, shared by editor and read-only views ---------- */
 .doc {
+  /* 60 to 75 characters a line for long-form text. */
+  max-inline-size: 75ch;
   font-family: var(--font-serif);
   font-size: 1rem;
   line-height: 1.7;
@@ -137,7 +139,8 @@ body {
   unicode-bidi: isolate;
   direction: ltr;
 }
-.doc .xref::after { content: attr(data-label); }
+/* In the editor the number is a decoration (the node is an atom); read-only views render real text. */
+.ProseMirror .xref::after { content: attr(data-label); }
 .doc .xref[data-broken] {
   color: var(--color-del);
   background: var(--color-del-bg);
@@ -145,7 +148,7 @@ body {
   padding-inline: 0.25em;
   border-radius: 3px;
 }
-.doc .xref[data-broken]::before { content: "⚠\00a0"; }
+.ProseMirror .xref[data-broken]::before { content: "⚠\00a0"; }
 
 .doc ins {
   color: var(--color-ins);

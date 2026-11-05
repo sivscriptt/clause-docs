@@ -29,7 +29,7 @@ describe("lifecycle transitions: the full matrix", () => {
   });
 
   it("explains a wrong state in words", () => {
-    expect(run("approve", "in_review", "approver")).toMatchObject({ reason: "Can't approve from in review." });
+    expect(run("approve", "in_review", "approver")).toMatchObject({ reason: "Can't approve a version that is in review." });
   });
 
   it("only activate supersedes the previous active version", () => {

@@ -7,6 +7,7 @@ import { plainText } from "./doc/tree";
 import { cleanView } from "./doc/views";
 import type { Doc } from "./doc/types";
 import { decide, RULES, type Action, type State } from "./lifecycle/machine";
+import { stateLabel } from "./lifecycle/labels";
 import { formatVersion, nextVersion, type Target } from "./lifecycle/version";
 import { tx } from "./db/client";
 
@@ -115,7 +116,7 @@ export async function saveContent(db: pg.Client, actor: Actor, versionId: string
   if (content?.type !== "doc" || !Array.isArray(content.content)) throw invalid("content must be a document.");
   return tx(db, async () => {
     const v = await lockVersion(db, versionId);
-    if (!EDITABLE.includes(v.state)) throw conflict("not_editable", `A version that is ${v.state.replace("_", " ")} can't be edited.`);
+    if (!EDITABLE.includes(v.state)) throw conflict("not_editable", `A version that is ${stateLabel(v.state).toLowerCase()} can't be edited.`);
     await db.query("UPDATE versions SET content = $2, plain_text = $3, updated_at = now() WHERE id = $1", [
       versionId,
       content,

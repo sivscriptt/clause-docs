@@ -35,6 +35,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </p>
         </header>
         <main id="main" className="flex-1">{children}</main>
+        {/* Outlives page remounts, so status changes are announced after a workflow step. */}
+        <div id="live" role="status" aria-live="polite" className="sr-only" />
         <footer className="no-print mt-12 bg-ink text-white">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-sm">
             <p>

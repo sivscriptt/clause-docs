@@ -3,6 +3,8 @@
  * so the UI (which buttons are enabled), the API and the database transaction
  * all use the same rules.
  */
+import { stateLabel } from "./labels";
+
 export const STATES = [
   "draft",
   "in_review",
@@ -68,7 +70,7 @@ const deny = (code: DenyCode, reason: string): Decision => ({ ok: false, code, r
 export function decide(i: DecisionInput): Decision {
   const rule = RULES[i.action];
   if (!rule.from.includes(i.state)) {
-    return deny("bad_state", `Can't ${rule.label.toLowerCase()} from ${i.state.replace("_", " ")}.`);
+    return deny("bad_state", `Can't ${rule.label.toLowerCase()} a version that is ${stateLabel(i.state).toLowerCase()}.`);
   }
   if (!rule.roles.some((r) => i.actor.roles.includes(r))) {
     return deny("forbidden_role", `Only ${rule.roles.join(" or ")} can do this.`);

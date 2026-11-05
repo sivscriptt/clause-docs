@@ -6,13 +6,14 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { commentAction, resolveAction, reviseAction, saveAction, transitionAction } from "@/app/actions";
 import { DocRender } from "@/components/DocRender";
 import { ClauseEditor } from "@/components/editor/ClauseEditor";
-import { StateBadge } from "@/components/StateBadge";
+import { StateBadge, stateLabel } from "@/components/StateBadge";
 import type { Actor } from "@/lib/auth";
 import type { Metadata } from "@/lib/doc/metadata";
 import { numberClauses } from "@/lib/doc/tree";
 import type { Doc } from "@/lib/doc/types";
 import { cleanView, listChanges, originalView } from "@/lib/doc/views";
 import type { Action, Decision, State } from "@/lib/lifecycle/machine";
+import { confirmDiscard } from "@/lib/unsaved";
 
 type Comment = {
   id: string; clause_id: string | null; parent_id: string | null; author_id: string; author_name: string;
@@ -63,6 +64,7 @@ export function Workspace(p: Props) {
   const [confirm, setConfirm] = useState<Action | null>(null);
   const [focusClause, setFocusClause] = useState<string | null>(null);
   const dir = p.doc.metadata.dir;
+  const lang = dir === "rtl" ? "dv" : "en";
   const nums = useMemo(() => numberClauses(content), [content]);
   const changes = useMemo(() => listChanges(content), [content]);
 
@@ -89,10 +91,33 @@ export function Workspace(p: Props) {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); saveRef.current(); }
     };
     const onLeave = (e: BeforeUnloadEvent) => e.preventDefault();
+    // In-app links don't fire beforeunload, so ask before following one.
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.("a[href]");
+      if (a && !a.getAttribute("href")?.startsWith("#") && !confirmDiscard()) { e.preventDefault(); e.stopPropagation(); }
+    };
+    document.body.dataset.unsaved = "true";
     window.addEventListener("keydown", onKey);
     window.addEventListener("beforeunload", onLeave);
-    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("beforeunload", onLeave); };
+    document.addEventListener("click", onClick, true);
+    return () => {
+      delete document.body.dataset.unsaved;
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("beforeunload", onLeave);
+      document.removeEventListener("click", onClick, true);
+    };
   }, [dirty]);
+
+  // After a workflow step the page remounts: move focus to the title and announce the new status.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    const msg = sessionStorage.getItem("announce");
+    if (!msg) return;
+    sessionStorage.removeItem("announce");
+    titleRef.current?.focus();
+    const live = document.getElementById("live");
+    if (live) live.textContent = msg;
+  }, []);
 
   const act = (action: Action) =>
     start(async () => {
@@ -103,7 +128,11 @@ export function Workspace(p: Props) {
         setDirty(false);
       }
       const r = await transitionAction(p.doc.id, p.version.id, action);
-      if (r.ok) { setError(null); router.refresh(); } else setError(r.error);
+      if (r.ok) {
+        setError(null);
+        sessionStorage.setItem("announce", `Status: ${stateLabel(r.data.to)}`);
+        router.refresh();
+      } else setError(r.error);
     });
 
   const revise = (target: "minor" | "major") =>
@@ -122,17 +151,25 @@ export function Workspace(p: Props) {
     setFocusClause(clauseId);
   };
 
+  // Only the person who raised a critical comment, or an admin, can resolve it. Say so.
+  const openCritical = p.comments.filter((c) => c.critical && !c.parent_id && !c.resolved_at);
+  const raisers = [...new Set(openCritical.map((c) => c.author_name))];
+  const iCanResolve = p.me.roles.includes("admin") || openCritical.every((c) => c.author_id === p.me.id);
+  const criticalHint = iCanResolve
+    ? `Resolve ${openCritical.length === 1 ? "it" : "them"} in the comments panel.`
+    : `Only ${raisers.join(" and ")} (who raised ${openCritical.length === 1 ? "it" : "them"}) or an admin can resolve ${openCritical.length === 1 ? "it" : "them"}. Reply in the comments panel to follow up.`;
+
   const available = p.actions.filter((a) => a.decision.ok || (a.decision.code !== "forbidden_role" && a.decision.code !== "bad_state"));
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       {/* Title block */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <nav aria-label="Breadcrumb" className="text-sm text-muted">
             <Link href="/" className="hover:text-ink hover:underline">Documents</Link>
           </nav>
-          <h1 className="mt-1 text-2xl font-semibold text-balance" dir="auto">{p.doc.metadata.title}</h1>
+          <h1 ref={titleRef} tabIndex={-1} className="mt-1 text-2xl font-semibold text-balance outline-none" dir="auto">{p.doc.metadata.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
             <StateBadge state={p.version.state} />
             <label className="flex items-center gap-1">
@@ -140,9 +177,12 @@ export function Workspace(p: Props) {
               <select
                 className="select h-8"
                 value={p.version.id}
-                onChange={(e) => router.push(`/docs/${p.doc.id}?v=${e.target.value}`)}
+                onChange={(e) => {
+                  if (confirmDiscard()) router.push(`/docs/${p.doc.id}?v=${e.target.value}`);
+                  else e.target.value = p.version.id;
+                }}
               >
-                {p.versions.map((v) => <option key={v.id} value={v.id}>{v.label} ({v.state.replace("_", " ")})</option>)}
+                {p.versions.map((v) => <option key={v.id} value={v.id}>{v.label} ({stateLabel(v.state).toLowerCase()})</option>)}
               </select>
             </label>
             <span>by {p.version.author}</span>
@@ -178,14 +218,21 @@ export function Workspace(p: Props) {
             )}
             {available.map(({ action, label, decision }) =>
               confirm === action ? (
-                <span key={action} role="group" aria-label={`Confirm: ${label}`} className="flex flex-wrap items-center gap-2 rounded-md bg-warn-bg px-2 py-1 text-sm text-warn">
+                <span key={action} role="group" aria-label={`Confirm: ${label}`} className="flex flex-wrap items-center gap-2 rounded-2xl bg-warn-bg px-3 py-1 text-sm text-warn">
                   {CONFIRM[action]}
-                  <button type="button" className="h-8 rounded-md bg-ink px-3 font-medium text-white" onClick={() => act(action)} disabled={pending}>{label}</button>
-                  <button type="button" className="h-8 rounded-full px-2 font-medium text-ink hover:bg-white" onClick={() => setConfirm(null)}>Cancel</button>
+                  <button type="button" autoFocus className="h-8 rounded-full bg-ink px-3 font-medium text-white" onClick={() => act(action)} disabled={pending}>{label}</button>
+                  <button
+                    type="button"
+                    className="h-8 rounded-full px-2 font-medium text-ink hover:bg-white"
+                    onClick={() => { setConfirm(null); requestAnimationFrame(() => document.getElementById(`act-${action}`)?.focus()); }}
+                  >
+                    Cancel
+                  </button>
                 </span>
               ) : (
                 <button
                   key={action}
+                  id={`act-${action}`}
                   type="button"
                   disabled={pending || !decision.ok}
                   aria-describedby={decision.ok ? undefined : `why-${action}`}
@@ -218,7 +265,7 @@ export function Workspace(p: Props) {
             decision.ok ? null : (
               <p key={action} id={`why-${action}`} className="mt-2 text-sm text-warn">
                 {decision.reason}
-                {decision.code === "critical_comments_open" && " Resolve them in the comments panel."}
+                {decision.code === "critical_comments_open" && ` ${criticalHint}`}
               </p>
             ),
           )}
@@ -252,16 +299,20 @@ export function Workspace(p: Props) {
                   document.getElementById(`tab-${next}`)?.focus();
                 }}
                 className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${
-                  view === v.id ? "border-coral text-ink" : "border-transparent text-muted hover:text-ink"
+                  view === v.id ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
                 }`}
               >
                 {v.label}
-                {v.id === "changes" && changes.length > 0 && <span className="ms-1.5 rounded-full bg-paper px-1.5 text-xs tabular-nums ring-1 ring-line">{changes.length}</span>}
+                {v.id === "changes" && changes.length > 0 && (
+                  <span className="ms-1.5 rounded-full bg-paper px-1.5 text-xs tabular-nums ring-1 ring-line">
+                    <span className="sr-only">(</span>{changes.length}<span className="sr-only">)</span>
+                  </span>
+                )}
               </button>
             ))}
           </div>
 
-          <div id="doc-panel" role="tabpanel" aria-labelledby={`tab-${view}`} className="rounded-lg border border-line bg-surface p-4 sm:p-8" dir={dir} lang={dir === "rtl" ? "dv" : "en"}>
+          <div id="doc-panel" role="tabpanel" aria-labelledby={`tab-${view}`} className="rounded-lg border border-line bg-surface p-4 sm:p-8">
             {view === "markup" &&
               (p.editable ? (
                 <ClauseEditor
@@ -273,7 +324,7 @@ export function Workspace(p: Props) {
                   onClause={setFocusClause}
                 />
               ) : (
-                <div className="doc"><DocRender doc={content} names={p.names} focusClause={focusClause} /></div>
+                <div className="doc" dir={dir} lang={lang}><DocRender doc={content} names={p.names} focusClause={focusClause} /></div>
               ))}
 
             {view === "changes" &&
@@ -300,17 +351,17 @@ export function Workspace(p: Props) {
                 </ol>
               ))}
 
-            {view === "clean" && <div className="doc"><DocRender doc={cleanView(content)} /></div>}
+            {view === "clean" && <div className="doc" dir={dir} lang={lang}><DocRender doc={cleanView(content)} /></div>}
 
             {view === "compare" && (
               <div className="grid gap-6 md:grid-cols-2">
                 <div className="min-w-0">
                   <h2 className="mb-2 text-sm font-semibold text-muted">{p.previousLabel ? `Version ${p.previousLabel} (active)` : "Before changes"}</h2>
-                  <div className="doc"><DocRender doc={p.previousContent ?? originalView(content)} /></div>
+                  <div className="doc" dir={dir} lang={lang}><DocRender doc={p.previousContent ?? originalView(content)} /></div>
                 </div>
                 <div className="min-w-0 md:border-s md:border-line md:ps-6">
                   <h2 className="mb-2 text-sm font-semibold text-muted">Version {p.version.label}, changes accepted</h2>
-                  <div className="doc"><DocRender doc={cleanView(content)} /></div>
+                  <div className="doc" dir={dir} lang={lang}><DocRender doc={cleanView(content)} /></div>
                 </div>
               </div>
             )}
@@ -348,11 +399,13 @@ function Comments(p: Props & { nums: Map<string, string>; focusClause: string | 
   const canResolve = (c: Comment) =>
     p.me.roles.includes("admin") || p.me.id === c.author_id || (!c.critical && p.version.authorId === p.me.id);
 
-  const Thread = ({ c }: { c: Comment }) => (
-    <li className={`rounded-lg border bg-white p-3 ${c.critical && !c.resolved_at ? "border-del/40" : "border-line"}`}>
+  // A render function, not a component: a component defined here would remount
+  // on every keystroke and reset the reply box.
+  const thread = (c: Comment) => (
+    <li key={c.id} className={`rounded-lg border bg-white p-3 ${c.critical && !c.resolved_at ? "border-del/40" : "border-line"}`}>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
         {c.critical && (
-          <span className={`rounded px-1.5 py-0.5 font-semibold ${c.resolved_at ? "bg-paper text-muted" : "bg-del-bg text-del"}`}>Critical</span>
+          <span className={`rounded-full px-2 py-0.5 font-semibold ${c.resolved_at ? "bg-paper text-muted" : "bg-del-bg text-del"}`}>Critical</span>
         )}
         {c.clause_id && (
           <button type="button" onClick={() => p.jumpTo(c.clause_id!)} className="font-medium text-accent underline underline-offset-2">
@@ -410,7 +463,7 @@ function Comments(p: Props & { nums: Map<string, string>; focusClause: string | 
     <aside aria-label="Comments" className="no-print min-w-0">
       <h2 className="flex items-center justify-between text-sm font-semibold">
         Comments
-        {p.criticalOpen > 0 && <span className="rounded bg-del-bg px-1.5 py-0.5 text-xs text-del">{p.criticalOpen} critical open</span>}
+        {p.criticalOpen > 0 && <span className="rounded-full bg-del-bg px-2 py-0.5 text-xs text-del">{p.criticalOpen} critical open</span>}
       </h2>
 
       {p.canComment && (
@@ -435,13 +488,13 @@ function Comments(p: Props & { nums: Map<string, string>; focusClause: string | 
       {error && <p role="alert" className="mt-2 rounded-md bg-del-bg px-3 py-2 text-sm text-del">{error}</p>}
 
       <ul className="mt-3 space-y-2">
-        {open.map((c) => <Thread key={c.id} c={c} />)}
+        {open.map(thread)}
         {open.length === 0 && <li className="text-sm text-muted">No open comments.</li>}
       </ul>
       {done.length > 0 && (
         <details className="mt-4">
           <summary className="cursor-pointer text-sm font-medium text-muted hover:text-ink">{done.length} resolved</summary>
-          <ul className="mt-2 space-y-2">{done.map((c) => <Thread key={c.id} c={c} />)}</ul>
+          <ul className="mt-2 space-y-2">{done.map(thread)}</ul>
         </details>
       )}
     </aside>

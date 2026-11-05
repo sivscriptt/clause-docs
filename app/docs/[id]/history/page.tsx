@@ -73,17 +73,19 @@ export default async function HistoryPage({ params }: PageProps<"/docs/[id]/hist
           <thead className="border-b border-line text-start text-muted">
             <tr>
               <th scope="col" className="px-4 py-2 text-start font-medium">When</th>
-              <th scope="col" className="px-4 py-2 text-start font-medium">Who</th>
+              <th scope="col" className="px-4 py-2 text-start font-medium max-sm:hidden">Who</th>
               <th scope="col" className="px-4 py-2 text-start font-medium">What</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {trail.map((a) => (
               <tr key={a.id}>
-                <td className="whitespace-nowrap px-4 py-2 tabular-nums text-muted">
+                <td className="px-4 py-2 tabular-nums text-muted sm:whitespace-nowrap">
                   {a.at.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Indian/Maldives" })}
+                  {/* On phones "Who" folds in here so "What" stays on screen. */}
+                  <span className="block text-ink sm:hidden">{a.actor_name}</span>
                 </td>
-                <td className="whitespace-nowrap px-4 py-2">{a.actor_name}</td>
+                <td className="whitespace-nowrap px-4 py-2 max-sm:hidden">{a.actor_name}</td>
                 <td className="px-4 py-2">
                   {ACTION[a.action] ?? a.action}
                   {a.entity === "version" && label(a.entity_id) && <span className="text-muted"> · version {label(a.entity_id)}</span>}

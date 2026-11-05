@@ -28,10 +28,11 @@ export function DocRender({ doc, names = {}, focusClause }: { doc: PMNode; names
         return <p key={key} dir="auto">{n.content?.map(render)}</p>;
       case "xref": {
         const num = nums.get(String(n.attrs?.target));
+        // Real text, so copy, find-in-page and printing keep the number.
         return num ? (
-          <a key={key} href={`#clause-${n.attrs?.target}`} className="xref" data-label={num} aria-label={`see clause ${num}`} />
+          <a key={key} href={`#clause-${n.attrs?.target}`} className="xref">{num}</a>
         ) : (
-          <span key={key} className="xref" data-label="missing clause" data-broken="true" role="note" aria-label="broken reference: the clause was deleted" />
+          <span key={key} className="xref" data-broken="true">⚠ missing clause</span>
         );
       }
       case "text": {
